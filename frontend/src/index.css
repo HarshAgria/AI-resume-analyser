@@ -1,0 +1,76 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
+
+:root {
+  --text: #4a5567;
+  --text-h: #0f172a;
+  --bg: #f3f7fb;
+  --border: #cfd9e7;
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-dark: rgba(14, 24, 39, 0.26);
+  --accent: #0f766e;
+  --accent-soft: #f59e0b;
+}
+
+.dark {
+  --text: #c3cfdf;
+  --text-h: #f4f7fb;
+  --bg: #08111f;
+  --border: #243248;
+  --surface: rgba(14, 24, 39, 0.45);
+  --surface-dark: rgba(9, 14, 24, 0.55);
+  --accent: #14b8a6;
+  --accent-soft: #f59e0b;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Manrope, "Segoe UI", sans-serif;
+  transition: background 0.35s ease, color 0.35s ease;
+  min-height: 100vh;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.font-display {
+  font-family: "Space Grotesk", Manrope, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+.glass {
+  background: var(--surface);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  box-shadow: 0 20px 45px rgba(5, 15, 35, 0.13);
+}
+
+.dark .glass {
+  background: var(--surface-dark);
+  border: 1px solid rgba(165, 180, 206, 0.16);
+  box-shadow: 0 22px 44px rgba(2, 7, 15, 0.5);
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(20, 184, 166, 0.2));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(20, 184, 166, 0.44));
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    line-height: 1.5;
+  }
+}
