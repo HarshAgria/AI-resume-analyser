@@ -101,4 +101,4 @@ const extractResumeText = async (buffer) => {
   };
 };
 
-module.exports = { extractResumeText };
+module.exports = { extractResumeText, normalizeText: cleanText };

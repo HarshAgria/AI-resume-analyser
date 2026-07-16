@@ -123,7 +123,7 @@ function App() {
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-(--text)/75 sm:text-base">
               Upload a resume, share a target role, and receive a polished review with alignment guidance and practical recommendations.
             </p>
-            <button onClick={() => setDark(!dark)} className="mt-4 h-10 w-10 rounded-full border border-(--border) bg-white/70 text-lg shadow-sm transition hover:scale-105 dark:bg-white/10" aria-label="Toggle color mode">
+            <button onClick={() => setDark(!dark)} className="cursor-pointer mt-4 h-10 w-10 rounded-full border border-(--border) bg-white/70 text-lg shadow-sm transition hover:scale-105 dark:bg-white/10" aria-label="Toggle color mode">
               {dark ? "🌙" : "☀️"}
             </button>
           </div>
@@ -188,7 +188,7 @@ function App() {
                       <div>This control removes your uploaded file from storage. Use only if needed.</div>
                     </div>
                     {uploadedFileUrl && (
-                      <button onClick={handleDeleteFile} className="rounded-full border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300">
+                      <button onClick={handleDeleteFile} className="cursor-pointer rounded-full border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300">
                         Delete uploaded file
                       </button>
                     )}
@@ -199,6 +199,15 @@ function App() {
           </motion.div>
         </div>
       </div>
+      <footer className="mt-8 text-center text-xs sm:text-sm text-(--text)/60">
+  <p>
+    Developed with ❤️ by{" "}
+    <span className="font-semibold text-teal-500">Harsh Agria</span>
+  </p>
+  <p className="mt-1 mb-6">
+    © {new Date().getFullYear()} AI Resume Analyzer
+  </p>
+</footer>
     </div>
   );
 }

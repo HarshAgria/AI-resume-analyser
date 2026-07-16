@@ -104,11 +104,18 @@ const analyzeResume = async (resumeText, targetRole = '') => {
   const model = genAI.getGenerativeModel({ model: MODEL_NAME });
   const normalized = normalizeText(resumeText);
   const compactText = normalized.slice(0, MAX_INPUT_CHARS * 2);
-
+  const currentDate = new Date().toISOString().split("T")[0];
   try {
     const preparedResume = await summarizeLongResume(model, compactText);
 
     const prompt = `
+Today's date is: ${currentDate}
+Timeline Rules:
+- Always use today's date shown above.
+- Never assume another current date.
+- Compare experience, internships, education, and projects against today's date.
+- Never incorrectly label past experience as future.
+- Ignore timeline issues if none exist.
 You are a senior recruiter and ATS optimization expert evaluating resumes for ANY profession, industry, and seniority.
 Your analysis must be fair, objective, and role-aware when a target role is provided.
 
@@ -124,8 +131,8 @@ ${targetRole || 'Not provided'}
 JSON schema:
 {
   "score": <number 1-10 with one decimal>,
-  "atsRating": <"Excellent" | "Good" | "Fair" | "Poor">,
-  "summary": "<2-3 sentence assessment>",
+  "atsRating": <"Outstanding" | "Excellent" | "Good" | "Fair" | "Poor">,
+  "summary": "<A concise 2-3 sentence recruiter-style assessment highlighting overall resume quality, ATS readiness, and role suitability.>",
   "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
   "improvements": ["<improvement 1>", "<improvement 2>", "<improvement 3>"],
   "missingKeywords": ["<keyword1>", "<keyword2>", "<keyword3>", "<keyword4>", "<keyword5>"],
@@ -135,12 +142,86 @@ JSON schema:
   "confidenceLevel": <number 0.0-1.0>,
   "recruiterApproval": <number 0-100>
 }
+Analysis Rules:
+- Analyze ONLY information present in the resume.
+- Never invent skills, certifications, experience, projects, or technologies.
+- Every recommendation must be supported by resume evidence.
+- Be objective and avoid assumptions.
+Missing Keywords Rules:
+- Suggest only keywords relevant to the target role (or the candidate's primary profession if no role is provided).
+- Do not include technologies already listed in the resume.
+- Return a maximum of 5 keywords.
+- Order keywords by importance.
+Recommended Roles Rules:
+- Return exactly 3 realistic industry job titles.
+- Roles should match at least 75% of the candidate's demonstrated experience.
+- Do not recommend unrelated roles.
+Scoring Guidelines:
+10.0 = Outstanding
+9.0-9.9 = Excellent
+8.0-8.9 = Strong
+7.0-7.9 = Good
+6.0-6.9 = Average
+Below 6.0 = Needs significant improvement
+The score should reflect ATS compatibility, recruiter appeal, relevance to the target role, clarity, measurable impact, and technical depth.
+Improvement Rules:
+- Focus on high-impact improvements.
+- Do not repeat strengths.
+- Do not recommend adding skills or experience that are unsupported by the resume.
+Role Alignment Rules:
+- If a target role is provided, evaluate alignment using the candidate's demonstrated skills, projects, and experience.
+- If no target role is provided, set:
+  alignment.matches = false
+  alignment.confidence = 0
+Role-Specific Evaluation:
 
-Rules:
-- Keep output grounded only in resume evidence.
-- If target role is empty, set alignment.matches=false and alignment.confidence=0.
-- Choose keywords relevant to the candidate's profession.
+If the target role is Backend, prioritize:
+- APIs
+- Databases
+- Scalability
+- Performance
+- Testing
+- Distributed Systems
+
+If Frontend:
+- UI
+- Accessibility
+- React/Vue/Angular
+- State Management
+- Performance
+
+If Full Stack:
+- Evaluate both frontend and backend.
+
+If DevOps:
+- Docker
+- Kubernetes
+- CI/CD
+- Cloud
+- Infrastructure as Code
+
+If Data/ML:
+- Python
+- Machine Learning
+- Statistics
+- Data Engineering
+- Model Deployment
+
+If Mobile:
+- Android/iOS
+- Flutter/React Native
+- App Architecture
+Response Rules:
 - Ensure valid JSON.
+- Every field in the schema is required.
+- Never omit a field.
+- If no data is available for an array, return an empty array [].
+- If no candidate name is found, return an empty string.
+- If no target role is provided:
+  {
+    "matches": false,
+    "confidence": 0
+  }
 `;
 
     const result = await withTimeout(model.generateContent(prompt), AI_TIMEOUT_MS);

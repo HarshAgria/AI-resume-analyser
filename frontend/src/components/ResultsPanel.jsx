@@ -170,7 +170,7 @@ export default function ResultsPanel({ analysis, onReset }) {
       <motion.button
         variants={item}
         onClick={onReset}
-        className="w-full rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-500 py-3 font-medium text-white shadow-lg transition hover:scale-[1.01]"
+        className="cursor-pointer w-full rounded-2xl bg-gradient-to-r from-teal-600 to-cyan-500 py-3 font-medium text-white shadow-lg transition hover:scale-[1.01]"
       >
         Analyze Another Resume
       </motion.button>
