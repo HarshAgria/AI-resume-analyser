@@ -1,0 +1,135 @@
+No. Once your frontend is hosted on Vercel, **your Docker container running on your local machine will not be used by the hosted frontend**.
+
+Your current setup would look like this:
+
+### Local development
+
+```
+Your PC
+│
+├── Docker Desktop
+│     └── Backend container
+│          └── localhost:3000
+│
+└── React frontend
+      └── localhost:5173
+```
+
+This works because your computer is running both parts.
+
+---
+
+### After deployment
+
+```
+User Browser
+      |
+      ↓
+Vercel
+(React Frontend)
+      |
+      ↓
+Render URL
+(Backend Docker Container)
+      |
+      ↓
+OpenAI + Cloudinary
+```
+
+The frontend will call something like:
+
+```env
+VITE_API_URL=https://resume-analyzer-backend.onrender.com
+```
+
+It will **not** call:
+
+```text
+http://localhost:3000
+```
+
+because `localhost` means "the user's own computer", not your machine.
+
+---
+
+## What happens if you turn on Docker Desktop?
+
+Your local container:
+
+```
+localhost:3000
+```
+
+will still work for you.
+
+You can test:
+
+```
+http://localhost:3000/api/health
+```
+
+and your local frontend can use it.
+
+But:
+
+```
+https://your-vercel-app.vercel.app
+```
+
+cannot reach it because your PC is not publicly accessible.
+
+---
+
+## Why do we deploy Docker to Render then?
+
+Because Render gives your container a public URL:
+
+Example:
+
+```
+https://resume-analyzer-backend.onrender.com
+```
+
+Your Vercel frontend can call that from anywhere.
+
+---
+
+## Your workflow after deployment
+
+For changes:
+
+### Backend changes
+
+1. Modify backend code
+2. Build Docker image
+
+```powershell
+docker build -t harshagria/resume-analyzer-backend:v1.0.1 .
+```
+
+3. Push:
+
+```powershell
+docker push harshagria/resume-analyzer-backend:v1.0.1
+```
+
+4. Update Render deployment
+
+---
+
+### Frontend changes
+
+1. Modify React code
+2. Push to GitHub
+
+```powershell
+git add .
+git commit -m "frontend update"
+git push
+```
+
+3. Vercel automatically redeploys.
+
+---
+
+For now, keep Docker Desktop for **local testing**. Render will become your always-available backend.
