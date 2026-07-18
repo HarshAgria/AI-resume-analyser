@@ -1,5 +1,11 @@
 # 🤖 AI Resume Analyzer — AI Hiring Copilot
 
+![React](https://img.shields.io/badge/React-19-blue?logo=react)
+![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js)
+![Docker](https://img.shields.io/badge/Docker-Containerized-blue?logo=docker)
+![Google Gemini](https://img.shields.io/badge/AI-Google_Gemini-orange)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+
 An AI-powered resume intelligence platform that analyzes resumes against modern hiring standards and provides recruiter-style feedback, ATS optimization insights, and role-specific improvement recommendations.
 
 Built using **React, Node.js, Docker, Cloudinary, and Google Gemini AI**, this project simulates a modern AI hiring assistant for candidates and recruiting teams.
@@ -8,11 +14,11 @@ Built using **React, Node.js, Docker, Cloudinary, and Google Gemini AI**, this p
 
 # 🌐 Live Application
 
-### Frontend
-https://ai-resume-analyser-eta-five.vercel.app/
+### 🚀 Live Demo
+[AI Resume Analyzer](https://ai-resume-analyser-eta-five.vercel.app/)
 
-### Backend API Health
-https://resume-analyzer-backend-fzl4.onrender.com/api/health
+### ❤️ API Health
+[Health Check](https://resume-analyzer-backend-fzl4.onrender.com/api/health/)
 
 ---
 
@@ -93,18 +99,26 @@ Users can remove uploaded resumes from storage when required.
 # 🏗 Architecture
 
 ```
-                  User
-                   |
-                   |
-             React Frontend
-                   |
-                   |
-             Node.js API
-                   |
-        -----------------------
-        |                     |
-   Cloudinary             Gemini AI
-   Storage                Analysis
+                User
+                  │
+                  ▼
+           React + Tailwind UI
+                  │
+             Axios Requests
+                  │
+                  ▼
+          Express REST API
+        ┌─────────┴──────────┐
+        │                    │
+        ▼                    ▼
+ Cloudinary Storage     Gemini AI Analysis
+        │                    │
+        └─────────┬──────────┘
+                  ▼
+        Structured Resume Analysis
+                  │
+                  ▼
+         Interactive Dashboard
 ```
 
 ### Processing Flow
@@ -138,10 +152,10 @@ Users can remove uploaded resumes from storage when required.
 
 The backend is containerized using Docker for portability and deployment flexibility.
 
-### Docker Image
+### Docker Hub
 
-```
-harshagria/resume-analyzer-backend:v1.0.0
+```bash
+docker pull harshagria/resume-analyzer-backend:v1.0.0
 ```
 
 ### Run Locally
@@ -150,6 +164,35 @@ harshagria/resume-analyzer-backend:v1.0.0
 cd backend
 
 docker-compose up --build
+```
+
+---
+
+# 📸 Screenshots
+## Landing page
+<img width="1862" height="838" alt="image" src="https://github.com/user-attachments/assets/ae82e85b-ccd2-4d68-ac6c-2218397128b7" />
+
+## Resume AI analysis Dashboard
+<img width="1680" height="857" alt="image" src="https://github.com/user-attachments/assets/b4ac52da-0129-4686-be26-6fb17430957f" />
+
+---
+
+# 📁 Repository Structure
+
+```text
+AI-resume-analyser
+├── backend
+│   ├── routes
+│   ├── services
+│   ├── utils
+│   ├── middleware
+│   └── Dockerfile
+├── frontend
+│   ├── components
+│   ├── api
+│   ├── assets
+│   └── App.jsx
+└── README.md
 ```
 
 ---
@@ -238,29 +281,27 @@ npm run dev
 
 ## AI Engineering
 
-- Prompt engineering
 - Structured AI output generation
 - Role-aware resume evaluation
 - ATS scoring logic
 - Recruiter-focused recommendations
 
+## Prompt Engineering
+
+- Custom recruiter-style prompt engineering
+- Structured JSON outputs
+- Hallucination prevention
+- Resume timeline validation
+
+
 ---
 
 # 🔒 Security & Privacy
-
-Implemented:
 
 - Environment variable based secret management
 - User consent workflow
 - Controlled resume processing
 - Resume deletion support
-
-Future improvements:
-
-- Authentication
-- User profiles
-- Resume history management
-- Role-based access control
 
 ---
 
@@ -269,9 +310,10 @@ Future improvements:
 ## Authentication System
 
 Planned:
-
-- Google OAuth login
-- Email/password authentication
+- Resume version comparison
+- AI interview preparation
+- Cover letter generation
+- Admin dashboard
 - User profile management
 - Resume history dashboard
 
@@ -307,17 +349,6 @@ Migration possibilities:
 - Add PostgreSQL user database
 - Add Redis caching
 
----
-
-# 📸 Screenshots
-- Landing page
-- Resume upload screen
-<img width="1862" height="838" alt="image" src="https://github.com/user-attachments/assets/ae82e85b-ccd2-4d68-ac6c-2218397128b7" />
-
-- ATS score dashboard
-- AI analysis results
-- Dark mode interface
-<img width="1680" height="857" alt="image" src="https://github.com/user-attachments/assets/b4ac52da-0129-4686-be26-6fb17430957f" />
 
 
 ---
@@ -331,6 +362,9 @@ NIT Kurukshetra '25
 
 GitHub:
 https://github.com/HarshAgria
+
+LinkedIn:
+https://www.linkedin.com/in/iamharshagria
 
 ---
 
@@ -346,3 +380,13 @@ This project demonstrates practical experience building an AI-powered SaaS appli
 - Production-oriented architecture
 
 The goal is to bridge the gap between traditional resume screening and AI-assisted hiring workflows.
+## Disclaimer
+
+AI-generated recommendations are intended as guidance and should complement, not replace, professional career advice or recruiter feedback.
+
+## Copyright
+
+© 2026 Harsh Agria. All Rights Reserved.
+
+This repository is intended for portfolio demonstration and evaluation purposes.
+Unauthorized copying, redistribution, or commercial use of the source code is prohibited without prior written permission.
