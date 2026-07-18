@@ -1,10 +1,14 @@
 # 🤖 AI Resume Analyzer — AI Hiring Copilot
 
-![React](https://img.shields.io/badge/React-19-blue?logo=react)
-![Node.js](https://img.shields.io/badge/Node.js-Express-green?logo=node.js)
-![Docker](https://img.shields.io/badge/Docker-Containerized-blue?logo=docker)
-![Google Gemini](https://img.shields.io/badge/AI-Google_Gemini-orange)
-![License](https://img.shields.io/badge/License-MIT-yellow)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=node.js&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker&logoColor=white)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_Storage-3448C5?logo=cloudinary&logoColor=white)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-AI-orange)
+![Render](https://img.shields.io/badge/Backend-Render-46E3B7?logo=render&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 
 An AI-powered resume intelligence platform that analyzes resumes against modern hiring standards and provides recruiter-style feedback, ATS optimization insights, and role-specific improvement recommendations.
 
