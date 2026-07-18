@@ -46,7 +46,7 @@ Examples:
 - Full Stack Developer
 - DevOps Engineer
 - Data Engineer
-- Data Analyst
+- Data Analyst, etc.
 
 The AI adapts evaluation criteria according to the selected role and analyzes relevant skills, technologies, and experience.
 
@@ -310,11 +310,6 @@ Migration possibilities:
 ---
 
 # 📸 Screenshots
-
-(Add screenshots)
-
-Recommended screenshots:
-
 - Landing page
 - Resume upload screen
 <img width="1862" height="838" alt="image" src="https://github.com/user-attachments/assets/ae82e85b-ccd2-4d68-ac6c-2218397128b7" />
