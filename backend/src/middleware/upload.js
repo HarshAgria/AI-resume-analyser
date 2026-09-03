@@ -5,15 +5,24 @@ const { AppError } = require('../utils/appError');
 const storage = multer.memoryStorage();
 const MAX_SIZE_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 5 * 1024 * 1024);
 
-const hasSuspitionName = (name = '') => {
-  const lowered = name.toLowerCase();
-  return lowered.includes('..') || lowered.includes('%00') || lowered.includes('.exe') || lowered.includes('.js');
+const hasSuspitionName = (name = "") => {
+  const lowered = name.toLowerCase().trim();
+
+  return (
+    lowered.includes("..") ||
+    lowered.includes("%00") ||
+    lowered.endsWith(".exe") ||
+    lowered.endsWith(".js") ||
+    lowered.endsWith(".sh") ||
+    lowered.endsWith(".bat") ||
+    lowered.endsWith(".cmd")
+  );
 };
 
 const isPdfSignatureValid = (buffer) => {
-  if (!buffer || buffer.length < 4) return false;
-  const header = buffer.subarray(0, 4).toString('utf-8');
-  return header === '%PDF';
+  if (!buffer || buffer.length < 5) return false;
+  const header = buffer.subarray(0, 5).toString('ascii');
+  return header === '%PDF-';
 };
 
 const fileFilter = (req, file, cb) => {
