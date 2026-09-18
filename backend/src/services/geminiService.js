@@ -614,20 +614,6 @@ Do not return markdown.
 Do not return comments.
 Do not return explanations outside the JSON object.
 
-========================================
-RESUME
-========================================
-
-${preparedResume.slice(
-  0,
-  MAX_INPUT_CHARS,
-)}
-
-========================================
-TARGET ROLE
-========================================
-
-${targetRole || "Not provided"}
 
 ========================================
 CURRENT DATE
@@ -800,95 +786,6 @@ JSON SCHEMA
   "recruiterApproval": <number 0-100>
 }
 
-========================================
-JD ANALYSIS RULES
-========================================
-
-If deterministic JD requirements are provided:
-
-- Calculate jdMatchScore from 0 to 100.
-- Use deterministic retrieval statuses as the primary evidence.
-- matchedRequirements may contain only strongly demonstrated requirements.
-- possibleRequirements may contain only uncertain/partial matches.
-- missingRequirements must contain only requirements with missing evidence.
-- possible_match requirements must not be treated as certain.
-- possible_match requirements belong in possibleRequirements, not missingRequirements.
-- Do not invent requirements.
-- Do not invent resume evidence.
-
-If no JD requirements are provided:
-
-- jdMatchScore = null
-- matchedRequirements = []
-- missingRequirements = []
-
-========================================
-GENERAL ANALYSIS RULES
-========================================
-
-Analyze ONLY information present in the resume.
-
-Never invent:
-- skills
-- certifications
-- experience
-- projects
-- technologies
-- employers
-- job titles
-- achievements
-
-Never assume experience from the target role.
-
-Recommendations must be supported by resume evidence.
-
-========================================
-DATE RULES
-========================================
-
-Use Current Date when interpreting dates.
-
-Treat:
-- Present
-- Current
-- ongoing
-
-as continuing through Current Date.
-
-Calculate experience only from explicitly provided dates.
-
-Do not assume missing dates.
-
-Do not treat future dates as completed experience.
-
-========================================
-MISSING KEYWORDS
-========================================
-
-Maximum 5.
-
-Only suggest keywords relevant to:
-- target role
-- the candidate's demonstrated domain and career direction
-
-Do not include technologies already present in the resume.
-
-Do not recommend unsupported technologies as if the candidate already knows them.
-
-========================================
-RECOMMENDED ROLES
-========================================
-
-Return exactly 3 realistic job titles.
-
-They must match demonstrated experience.
-
-Do not recommend unrelated roles.
-
-========================================
-SCORING
-========================================
-
 10.0 = Outstanding
 9.0-9.9 = Excellent
 8.0-8.9 = Strong
@@ -906,36 +803,6 @@ Score based on:
 - structure
 - demonstrated experience
 
-========================================
-IMPROVEMENTS
-========================================
-
-Focus on high-impact improvements.
-
-Do not repeat strengths.
-
-Do not recommend adding experience the candidate does not have.
-
-Do not claim that the candidate should add a technology as existing experience.
-
-========================================
-ROLE ALIGNMENT
-========================================
-
-If a target role is provided:
-
-Evaluate alignment using demonstrated skills, projects, and experience.
-
-If no target role is provided:
-
-alignment.matches = false
-alignment.confidence = 0
-
-========================================
-FINAL OUTPUT
-========================================
-
-Return ONLY valid JSON.
 `;
 
     const { result } =

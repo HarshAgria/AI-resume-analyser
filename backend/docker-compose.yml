@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   backend:
@@ -7,12 +7,14 @@ services:
     container_name: resume-analyse-backend
     ports:
       - '3000:3000'
-    environment:
-      - PORT=3000
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - FRONTEND_URL=${FRONTEND_URL}
-    volumes:
-      - .env:/app/.env  # mounts your .env file into the container
+    # environment:
+    #   - PORT=3000
+    #   - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+    #   - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+    #   - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+    #   - GEMINI_API_KEY=${GEMINI_API_KEY}
+    #   - FRONTEND_URL=${FRONTEND_URL}
+    # volumes:
+    #   - .env:/app/.env  # mounts your .env file into the container
+    env_file:
+      - .env

@@ -351,6 +351,15 @@ function App() {
           </footer>
         </div>
       </div>
+      <footer className="mt-8 text-center text-xs sm:text-sm text-(--text)/60">
+  <p>
+    Developed with ❤️ by{" "}
+    <span className="font-semibold text-teal-500">Harsh Agria</span>
+  </p>
+  <p className="mt-1 mb-6">
+    © {new Date().getFullYear()} AI Resume Analyzer
+  </p>
+</footer>
     </div>
   );
 }
