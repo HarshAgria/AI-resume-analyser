@@ -10,35 +10,68 @@ import Confetti from "react-confetti";
 function App() {
   const [dark, setDark] = useState(true);
   const [loading, setLoading] = useState(false);
+
   const [result, setResult] = useState(null);
   const [extraction, setExtraction] = useState(null);
+
   const [error, setError] = useState("");
+
   const [role, setRole] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+
   const [consent, setConsent] = useState(false);
+
   const [uploadedFileUrl, setUploadedFileUrl] = useState("");
   const [uploadedPublicId, setUploadedPublicId] = useState("");
-  const [pointer, setPointer] = useState({ x: 0, y: 0 });
-  const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
 
+  const [pointer, setPointer] = useState({ x: 0, y: 0 });
+
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== "undefined" ? window.innerWidth : 1200,
+    height: typeof window !== "undefined" ? window.innerHeight : 800,
+  });
+
+  /*
+   * ---------------------------------------------------------
+   * DARK MODE
+   * ---------------------------------------------------------
+   */
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
+  /*
+   * ---------------------------------------------------------
+   * WINDOW RESIZE
+   * ---------------------------------------------------------
+   */
   useEffect(() => {
-    const onResize = () => setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
+  // BACKGROUND MOUSE EFFECT
   const handleMouseMove = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     setPointer({ x: event.clientX - rect.left, y: event.clientY - rect.top });
   };
 
-  const handleFileSelect = async (file, roleInput = "") => {
+  const handleFileSelect = async (file) => {
     if (!file) return;
     if (!consent) {
-      setError("Please confirm the consent notice before uploading your resume.");
+      setError(
+        "Please confirm the consent notice before uploading your resume.",
+      );
       return;
     }
 
@@ -50,13 +83,30 @@ function App() {
     setUploadedPublicId("");
 
     try {
-      const data = await analyzeResume(file, roleInput);
-      setResult(data?.analysis || null);
-      setExtraction(data?.extraction || null);
-      setUploadedFileUrl(data?.fileUrl || "");
-      setUploadedPublicId(data?.publicId || "");
+      const data = await analyzeResume(
+        file,
+        role.trim(),
+        jobDescription.trim(),
+      );
+
+      /* * Defensive API response handling. */ const analysis =
+        data?.analysis ?? null;
+      const extracted = data?.extraction ?? null;
+      if (!analysis) {
+        throw new Error("The server did not return a valid resume analysis.");
+      }
+      setResult(analysis);
+      setExtraction(extracted);
+      setUploadedFileUrl(data?.fileUrl ?? "");
+      setUploadedPublicId(data?.publicId ?? "");
     } catch (err) {
-      setError(err?.message || "Analysis failed");
+      console.error("Resume analysis error:", err);
+      setResult(null);
+      setExtraction(null);
+      setError(
+        err?.message ||
+          "Analysis failed. Please check your resume and try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -80,12 +130,17 @@ function App() {
     setError("");
     setUploadedFileUrl("");
     setUploadedPublicId("");
+    setRole("");
+    setJobDescription("");
   };
 
   const celebrate = Number(result?.score || 0) >= 8;
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-(--bg) text-(--text)" onMouseMove={handleMouseMove}>
+    <div
+      className="min-h-screen relative overflow-hidden bg-(--bg) text-(--text)"
+      onMouseMove={handleMouseMove}
+    >
       {celebrate && (
         <Confetti
           width={windowSize.width}
@@ -119,38 +174,121 @@ function App() {
             <div className="inline-flex items-center gap-2 rounded-full border border-(--border) bg-white/60 px-3 py-1 text-xs uppercase tracking-[0.24em] text-teal-600 dark:bg-white/10">
               AI hiring copilot
             </div>
-            <h1 className="font-display mt-3 text-3xl font-semibold text-(--text-h) sm:text-4xl lg:text-5xl">AI Resume Analyzer for modern hiring teams</h1>
+            <h1 className="font-display mt-3 text-3xl font-semibold text-(--text-h) sm:text-4xl lg:text-5xl">
+              AI Resume Analyzer for modern hiring teams
+            </h1>
             <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-(--text)/75 sm:text-base">
-              Upload a resume, share a target role, and receive a polished review with alignment guidance and practical recommendations.
+              Upload a resume, share a target role, job description and receive
+              a polished review with alignment guidance and practical
+              recommendations.
             </p>
-            <button onClick={() => setDark(!dark)} className="mt-4 h-10 w-10 rounded-full border border-(--border) bg-white/70 text-lg shadow-sm transition hover:scale-105 dark:bg-white/10" aria-label="Toggle color mode">
+            {/* Theme toggle */}
+            <button
+              type="button"
+              onClick={() => setDark((previous) => !previous)}
+              className="mt-4 h-10 w-10 rounded-full border border-(--border) bg-white/70 text-lg shadow-sm transition hover:scale-105 dark:bg-white/10"
+              aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+            >
               {dark ? "🌙" : "☀️"}
             </button>
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="glass rounded-3xl border border-white/25 p-4 shadow-2xl sm:p-6 lg:p-8">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-3xl border border-white/25 p-4 shadow-2xl sm:p-6 lg:p-8"
+          >
             {!result && !loading && (
               <div className="space-y-4 lg:grid lg:grid-cols-[1.15fr_0.85fr] lg:gap-6 lg:space-y-0">
+                {/* LEFT SIDE */}
                 <div className="space-y-4">
+                  {/* Job description */}
                   <div className="rounded-2xl border border-(--border) bg-white/65 p-4 text-left shadow-sm dark:bg-black/20">
-                    <label className="mb-2 block text-sm font-medium">Target role</label>
-                    <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Senior Backend Engineer" className="w-full rounded-xl border border-(--border) bg-(--bg)/80 p-3 outline-none focus:ring-2 focus:ring-emerald-500" />
-                    <p className="mt-2 text-xs opacity-70">Optional: add the role to receive role-fit insights and recommended roles.</p>
+                    <label
+                      htmlFor="job-description"
+                      className="mb-2 block text-sm font-medium"
+                    >
+                      Job description
+                    </label>
+
+                    <textarea
+                      id="job-description"
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                      placeholder="Paste the job description here for ATS and requirement matching..."
+                      rows={8}
+                      className="w-full resize-y rounded-xl border border-(--border) bg-(--bg)/80 p-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+
+                    <div className="mt-2 flex items-center justify-between text-xs opacity-70">
+                      <span>Optional: enables JD requirement matching.</span>
+
+                      <span>{jobDescription.length} characters</span>
+                    </div>
+                  </div>
+
+                  {/* Target role */}
+                  <div className="rounded-2xl border border-(--border) bg-white/65 p-4 text-left shadow-sm dark:bg-black/20">
+                    <label
+                      htmlFor="target-role"
+                      className="mb-2 block text-sm font-medium"
+                    >
+                      Target role
+                    </label>
+                    <input
+                      id="target-role"
+                      type="text"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      placeholder="e.g. Senior Backend Engineer"
+                      className="w-full rounded-xl border border-(--border) bg-(--bg)/80 p-3 outline-none focus:ring-2 focus:ring-emerald-500"
+                    />
+                    <p className="mt-2 text-xs opacity-70">
+                      Optional: add the role to receive role-fit insights and
+                      recommended roles.
+                    </p>
                   </div>
 
                   <div className="rounded-2xl border border-(--border) bg-white/65 p-4 shadow-sm dark:bg-black/20">
                     <h3 className="mb-2 font-semibold">Retention & privacy</h3>
-                    <p className="text-sm opacity-80">We keep uploaded files only as long as needed for review. You can delete them from storage at any time.</p>
+                    <p className="text-sm opacity-80">
+                      We keep uploaded files only as long as needed for review.
+                      You can delete them from storage at any time.
+                    </p>
                   </div>
                 </div>
 
-                <UploadBox onFileSelect={(file) => handleFileSelect(file, role)} consent={consent} onConsentChange={setConsent} />
+                {/* RIGHT SIDE */}
+                <UploadBox
+                  onFileSelect={handleFileSelect}
+                  consent={consent}
+                  onConsentChange={(checked) => {
+                    setConsent(checked);
+
+                    /*
+                     * Remove consent-related error once the user
+                     * checks the box.
+                     */
+                    if (checked) {
+                      setError("");
+                    }
+                  }}
+                />
               </div>
             )}
 
+            {/* LOADING */}
             {loading && <Loader />}
 
-            {error && <div className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-400">{error}</div>}
+            {/* GLOBAL ERROR */}
+            {error && (
+              <div
+                role="alert"
+                className="mt-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-400"
+              >
+                {error}
+              </div>
+            )}
 
             {result && (
               <div className="space-y-6">
@@ -167,7 +305,8 @@ function App() {
 
                 {extraction?.weakQuality && (
                   <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-700 dark:text-amber-300">
-                    Warning: extracted text quality is low. Analysis may be less accurate. Upload a searchable PDF for best results.
+                    Warning: extracted text quality is low. Analysis may be less
+                    accurate. Upload a searchable PDF for best results.
                   </div>
                 )}
 
@@ -184,11 +323,20 @@ function App() {
                 <div className="rounded-2xl border border-(--border) bg-white/45 p-4 text-xs text-(--text)/70 dark:bg-black/10">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <div className="font-medium text-(--text-h)">Delete Analysis</div>
-                      <div>This control removes your uploaded file from storage. Use only if needed.</div>
+                      <div className="font-medium text-(--text-h)">
+                        Delete Analysis
+                      </div>
+                      <div>
+                        This control removes your uploaded file from storage.
+                        Use only if needed.
+                      </div>
                     </div>
                     {uploadedFileUrl && (
-                      <button onClick={handleDeleteFile} className="rounded-full border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300">
+                      <button
+                        type="button"
+                        onClick={handleDeleteFile}
+                        className="rounded-full border border-rose-400/35 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-700 transition hover:bg-rose-500/15 dark:text-rose-300"
+                      >
                         Delete uploaded file
                       </button>
                     )}
@@ -197,6 +345,10 @@ function App() {
               </div>
             )}
           </motion.div>
+          <footer className="mt-5 text-center text-xs text-(--text)/60 sm:mt-8">
+            <p>© 2026 All Rights Reserved.</p>
+            <p className="mt-1">Built with ❤️ by Harsh Agria</p>
+          </footer>
         </div>
       </div>
     </div>

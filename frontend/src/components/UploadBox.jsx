@@ -45,7 +45,7 @@ const UploadBox = ({ onFileSelect, consent, onConsentChange }) => {
 
       <div className="font-display text-5xl text-teal-600 dark:text-teal-300">PDF</div>
       <p className="mt-3 font-medium text-(--text-h)">{file || "Drag and drop your resume"}</p>
-      <p className="mt-1 text-sm opacity-60">PDF only • Max 5MB • Encrypted uploads</p>
+      <p className="mt-1 text-sm opacity-60">PDF only • Max 5MB • Secure server-side validation</p>
       {err && <p className="mt-2 text-sm text-red-400">{err}</p>}
     </div>
   );
