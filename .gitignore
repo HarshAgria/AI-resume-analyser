@@ -1,0 +1,23 @@
+# Environment / secrets
+.env
+.env.*
+
+# Node
+node_modules/
+npm-debug.log*
+
+# RAG / Chroma local data
+backend/chromadb_data/
+
+# Local test resumes
+backend/*.pdf
+
+# RAG test scripts
+# backend/test-rag.js
+# backend/test-rag-long.js
+
+# Logs
+backend/logs/
+
+# Uploads
+backend/uploads/

@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+.env
+.git
+.gitignore
+chromadb_data
+uploads
+test-*.js
+*.pdf

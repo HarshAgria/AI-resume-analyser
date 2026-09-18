@@ -103,7 +103,10 @@ const ScoreCard = ({ score = 0, atsRating, candidateName = "", confidenceLevel =
   const normalizedScore = Math.max(0, Math.min(10, Number(score) || 0));
   const progress = normalizedScore / 10;
   const offset = circumference - progress * circumference;
-  const stars = Math.max(1, Math.min(5, Math.round((normalizedScore / 10) * 5)));
+  const stars = Math.min(
+  5,
+  Math.max(0, Math.round((normalizedScore / 10) * 5))
+);
 
   const confidence = useMemo(() => {
     const value = typeof confidenceLevel === "number" ? confidenceLevel : normalizedScore / 10;
