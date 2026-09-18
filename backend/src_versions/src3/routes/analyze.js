@@ -15,7 +15,6 @@ const {
 const { analyzeResume } = require("../services/geminiService");
 const { extractResumeText } = require("../utils/textExtraction");
 const { AppError } = require("../utils/appError");
-const { scoreRequirements } = require("../services/embeddingService");
 const { auditLog, redact } = require("../utils/auditLogger");
 
 // ==================================================
@@ -327,19 +326,9 @@ router.post("/", upload, async (req, res, next) => {
 
         // The RAG service owns scoring. This prevents the route and the LLM
         // from maintaining competing scoring implementations.
-        // Calculate the displayed JD score from the exact requirement objects
-        // returned by the matcher. Do not trust an LLM-generated score or a
-        // separately serialized score field. This also protects against MCP
-        // serialization/version mismatches.
-        deterministicJdMatchScore = scoreRequirements(ragResults);
-
-        console.log(
-          `[JD MATCH] requirements=${ragResults.length} ` +
-          `strong=${ragResults.filter((x) => x?.status === "strong_match").length} ` +
-          `possible=${ragResults.filter((x) => x?.status === "possible_match").length} ` +
-          `missing=${ragResults.filter((x) => x?.status === "missing").length} ` +
-          `score=${deterministicJdMatchScore}`,
-        );
+        deterministicJdMatchScore = Number.isFinite(Number(evidenceData?.jdMatchScore))
+          ? Number(evidenceData.jdMatchScore)
+          : 0;
 
         deterministicBlockingRequirements = Array.isArray(evidenceData?.blockingRequirements)
           ? evidenceData.blockingRequirements

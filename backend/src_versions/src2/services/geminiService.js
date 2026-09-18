@@ -18,14 +18,7 @@ const genAI = new GoogleGenerativeAI(
 
 const MODEL_NAME =
   process.env.GEMINI_MODEL ||
-  "gemini-3.5-flash-lite";
-
-const MODEL_FALLBACKS = (process.env.GEMINI_MODEL_FALLBACKS || "gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash")
-  .split(",")
-  .map((m) => m.trim())
-  .filter(Boolean);
-const MAX_MODEL_RETRIES = Number(process.env.GEMINI_MODEL_RETRIES || 2);
-const RETRY_BASE_MS = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
+  "gemini-3.1-flash-lite";
 
 const MAX_INPUT_CHARS = Number(
   process.env.MAX_AI_INPUT_CHARS || 22000,
@@ -74,49 +67,6 @@ const withTimeout = async (
   } finally {
     clearTimeout(timeoutHandle);
   }
-};
-
-const isTransientGeminiError = (error) => {
-  const status = Number(error?.status || error?.statusCode || error?.code);
-  if ([429, 500, 502, 503, 504].includes(status)) return true;
-  const message = String(error?.message || error || "").toLowerCase();
-  return /service unavailable|temporarily unavailable|high demand|overloaded|rate limit|quota|timeout|timed out|fetching from .*generativelanguage/i.test(message);
-};
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const generateWithModelFallback = async (prompt) => {
-  const models = [...new Set([MODEL_NAME, ...MODEL_FALLBACKS])];
-  let lastError;
-
-  for (const modelName of models) {
-    const model = genAI.getGenerativeModel({ model: modelName });
-
-    for (let attempt = 0; attempt <= MAX_MODEL_RETRIES; attempt += 1) {
-      try {
-        const result = await withTimeout(model.generateContent(prompt), AI_TIMEOUT_MS);
-        return { result, modelName };
-      } catch (error) {
-        lastError = error;
-        const status = Number(error?.status || error?.statusCode || error?.code);
-        const message = String(error?.message || error || "");
-        const modelUnavailable = [400, 404].includes(status) || /model.*(not found|does not exist|not supported)|not found/i.test(message);
-
-        // A bad/retired model must not consume retries. Move immediately to the next model.
-        if (modelUnavailable) break;
-        if (!isTransientGeminiError(error) || attempt === MAX_MODEL_RETRIES) break;
-        await sleep(RETRY_BASE_MS * (2 ** attempt));
-      }
-    }
-  }
-
-  throw new AppError(
-    "AI_MODEL_UNAVAILABLE",
-    "Gemini is temporarily unavailable. The analyzer tried the configured model and fallback models. Please retry shortly.",
-    503,
-    lastError?.message,
-    true,
-  );
 };
 
 // ==================================================
@@ -203,6 +153,7 @@ const splitIntoChunks = async (
 // ==================================================
 
 const summarizeLongResume = async (
+  model,
   text,
 ) => {
   if (!text) {
@@ -260,10 +211,13 @@ Section ${index + 1}/${chunks.length}:
 ${chunk}
 `;
 
-    const { result } =
-      await generateWithModelFallback(
+    const result =
+      await withTimeout(
+        model.generateContent(
           chunkPrompt,
-        );
+        ),
+        AI_TIMEOUT_MS,
+      );
 
     const summary =
       result.response
@@ -316,9 +270,12 @@ Resume notes:
 ${combined}
 `;
 
-  const { result } =
-    await generateWithModelFallback(
-      compressionPrompt,
+  const result =
+    await withTimeout(
+      model.generateContent(
+        compressionPrompt,
+      ),
+      AI_TIMEOUT_MS,
     );
 
   return result.response
@@ -504,22 +461,6 @@ const mapAiError = (
   }
 
   if (
-    message.includes("503") ||
-    message.includes("service unavailable") ||
-    message.includes("high demand") ||
-    message.includes("temporarily unavailable") ||
-    message.includes("overloaded")
-  ) {
-    return new AppError(
-      "AI_MODEL_UNAVAILABLE",
-      "Gemini is temporarily overloaded. Please retry shortly; the analyzer will automatically use a fallback model when available.",
-      503,
-      err.message,
-      true,
-    );
-  }
-
-  if (
     message.includes(
       "429",
     ) ||
@@ -568,6 +509,11 @@ const analyzeResume = async (
     );
   }
 
+  const model =
+    genAI.getGenerativeModel({
+      model: MODEL_NAME,
+    });
+
   const normalized =
     normalizeText(
       resumeText,
@@ -593,6 +539,7 @@ const analyzeResume = async (
   try {
     const preparedResume =
       await summarizeLongResume(
+        model,
         normalized,
       );
 
@@ -938,10 +885,13 @@ FINAL OUTPUT
 Return ONLY valid JSON.
 `;
 
-    const { result } =
-      await generateWithModelFallback(
+    const result =
+      await withTimeout(
+        model.generateContent(
           prompt,
-        );
+        ),
+        AI_TIMEOUT_MS,
+      );
 
     const parsed =
       parseJsonResponse(

@@ -15,7 +15,6 @@ const {
 const { analyzeResume } = require("../services/geminiService");
 const { extractResumeText } = require("../utils/textExtraction");
 const { AppError } = require("../utils/appError");
-const { scoreRequirements } = require("../services/embeddingService");
 const { auditLog, redact } = require("../utils/auditLogger");
 
 // ==================================================
@@ -325,31 +324,35 @@ router.post("/", upload, async (req, res, next) => {
           .map((item) => item.requirement)
           .filter(Boolean);
 
-        // The RAG service owns scoring. This prevents the route and the LLM
-        // from maintaining competing scoring implementations.
-        // Calculate the displayed JD score from the exact requirement objects
-        // returned by the matcher. Do not trust an LLM-generated score or a
-        // separately serialized score field. This also protects against MCP
-        // serialization/version mismatches.
-        deterministicJdMatchScore = scoreRequirements(ragResults);
+        // Weighted, domain-agnostic scoring. Importance comes from the JD
+        // requirement extractor rather than profession-specific rules.
+        const statusValue = {
+          strong_match: 1,
+          possible_match: 0.5,
+          missing: 0,
+        };
 
-        console.log(
-          `[JD MATCH] requirements=${ragResults.length} ` +
-          `strong=${ragResults.filter((x) => x?.status === "strong_match").length} ` +
-          `possible=${ragResults.filter((x) => x?.status === "possible_match").length} ` +
-          `missing=${ragResults.filter((x) => x?.status === "missing").length} ` +
-          `score=${deterministicJdMatchScore}`,
+        const weightedTotal = ragResults.reduce(
+          (total, item) => total + (Number(item?.weight) || 1),
+          0,
         );
 
-        deterministicBlockingRequirements = Array.isArray(evidenceData?.blockingRequirements)
-          ? evidenceData.blockingRequirements
-          : ragResults
-              .filter((item) =>
-                ["critical", "required"].includes(item?.importance) &&
-                item?.status === "missing"
-              )
-              .map((item) => item.requirement)
-              .filter(Boolean);
+        const weightedEvidence = ragResults.reduce((total, item) => {
+          const weight = Number(item?.weight) || 1;
+          return total + weight * (statusValue[item?.status] || 0);
+        }, 0);
+
+        deterministicJdMatchScore = weightedTotal > 0
+          ? Number(((weightedEvidence / weightedTotal) * 100).toFixed(1))
+          : 0;
+
+        deterministicBlockingRequirements = ragResults
+          .filter((item) =>
+            (item?.importance === "critical" || item?.importance === "required") &&
+            item?.status === "missing"
+          )
+          .map((item) => item.requirement)
+          .filter(Boolean);
 
         hasJDAnalysis = ragResults.length > 0;
       } finally {

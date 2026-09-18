@@ -237,6 +237,7 @@ const validateAlternativeBranch = (branch, resumeText) => {
 };
 
 const structuredValidation = (requirement, resumeText, category) => {
+  requirement = typeof requirement === "object" ? requirement?.text : requirement;
   const req = normalizeText(requirement);
 
   // Handle universal OR-qualified requirements such as:
@@ -296,13 +297,117 @@ const structuredValidation = (requirement, resumeText, category) => {
   return null;
 };
 
+const inferLogicalStructure = (requirement) => {
+  const text = cleanRequirement(typeof requirement === "object" ? requirement?.text : requirement);
+  const normalized = normalizeText(text);
+
+  // Explicit structure produced by the extractor always wins.
+  if (requirement && typeof requirement === "object") {
+    if (Array.isArray(requirement.alternatives) && requirement.alternatives.length > 1) {
+      return { logic: "OR", alternatives: requirement.alternatives.map((x) => cleanRequirement(x?.text || x)) };
+    }
+    if (Array.isArray(requirement.components) && requirement.components.length > 1) {
+      return { logic: requirement.logic || "AND", components: requirement.components.map((x) => cleanRequirement(x?.text || x)).filter(Boolean) };
+    }
+    if (requirement.logic === "OR" || requirement.logic === "AND") {
+      const pieces = String(requirement.text || text).split(requirement.logic === "OR" ? /\s+or\s+/i : /\s+and\s+/i).map(cleanRequirement).filter(Boolean);
+      if (pieces.length > 1) return requirement.logic === "OR" ? { logic: "OR", alternatives: pieces } : { logic: "AND", components: pieces };
+    }
+  }
+
+  // Domain-agnostic fallback for extractor versions that only return text.
+  const orParts = text.split(/\s+or\s+/i).map(cleanRequirement).filter(Boolean);
+  if (orParts.length > 1 && orParts.every((part) => part.length >= 3)) {
+    return { logic: "OR", alternatives: orParts };
+  }
+
+  // Prefer a clause boundary such as ", and" before falling back to a
+  // simple conjunction. This avoids turning phrases like
+  // "design and execute test plans, and develop automation" into three
+  // artificial requirements ("design", "execute test plans", ...).
+  const clauseAndParts = text.split(/,\s+and\s+/i).map(cleanRequirement).filter(Boolean);
+  if (clauseAndParts.length > 1 && clauseAndParts.every((part) => part.length >= 3)) {
+    return { logic: "AND", components: clauseAndParts };
+  }
+
+  const andParts = text.split(/\s+and\s+/i).map(cleanRequirement).filter(Boolean);
+  if (andParts.length > 1 && andParts.every((part) => part.length >= 3)) {
+    return { logic: "AND", components: andParts };
+  }
+
+  return null;
+};
+
+const evaluateLogicalParts = (structure, semanticEvidence, resumeText, category) => {
+  const parts = structure.logic === "OR" ? structure.alternatives : structure.components;
+  const evaluations = parts.map((part) => {
+    const structured = structuredValidation(part, resumeText, category);
+    if (structured) return { status: structured.status, reason: structured.reason, text: part };
+
+    const explicit = explicitEvidence(part, resumeText
+      ? resumeText.split(/\n{2,}/).map((text, i) => ({ text, chunkIndex: i }))
+      : semanticEvidence);
+
+    if (explicit.explicit) {
+      return { status: "strong_match", reason: "Explicit resume evidence supports this component.", text: part };
+    }
+
+    // Semantic similarity is discovery evidence, not proof of a component.
+    // It may make an unresolved component possible, but never strong.
+    if (explicit.lexicalScore > 0 || semanticEvidence.some((item) => Number(item.distance) <= POSSIBLE_MATCH_DISTANCE)) {
+      return { status: "possible_match", reason: "Related evidence exists, but the component is not explicitly demonstrated.", text: part };
+    }
+
+    return { status: "missing", reason: "No sufficient evidence was found for this component.", text: part };
+  });
+
+  if (structure.logic === "OR") {
+    const strong = evaluations.find((x) => x.status === "strong_match");
+    if (strong) return { status: "strong_match", reason: `One alternative is explicitly satisfied: "${strong.text}".`, componentResults: evaluations };
+    const possible = evaluations.find((x) => x.status === "possible_match");
+    if (possible) return { status: "possible_match", reason: "At least one alternative has supporting but non-conclusive evidence.", componentResults: evaluations };
+    return { status: "missing", reason: "None of the alternatives is sufficiently evidenced.", componentResults: evaluations };
+  }
+
+  const missing = evaluations.filter((x) => x.status === "missing");
+  if (missing.length) {
+    const strongCount = evaluations.filter((x) => x.status === "strong_match").length;
+    return {
+      status: strongCount ? "possible_match" : "missing",
+      reason: `An AND requirement is only fully satisfied when every component is evidenced. Missing: ${missing.map((x) => x.text).join(", ")}.`,
+      componentResults: evaluations,
+    };
+  }
+
+  if (evaluations.some((x) => x.status === "possible_match")) {
+    return { status: "possible_match", reason: "All components have some supporting evidence, but at least one is not explicitly demonstrated.", componentResults: evaluations };
+  }
+
+  return { status: "strong_match", reason: "All required components are explicitly evidenced in the resume.", componentResults: evaluations };
+};
+
 const getEvidenceStatus = (requirement, evidence, resumeText = "", category = "other") => {
   const semanticEvidence = Array.isArray(evidence) ? evidence : [];
+  const logicalStructure = inferLogicalStructure(requirement);
   const allChunks = semanticEvidence.map((item) => ({ text: item.text || "", chunkIndex: item.chunkIndex ?? null }));
-  const explicit = explicitEvidence(requirement, resumeText ? resumeText.split(/\n{2,}/).map((text, i) => ({ text, chunkIndex: i })) : allChunks);
+  const explicit = explicitEvidence(requirement?.text || requirement, resumeText ? resumeText.split(/\n{2,}/).map((text, i) => ({ text, chunkIndex: i })) : allChunks);
   const bestDistance = semanticEvidence.length ? semanticEvidence[0].distance : null;
 
-  const structured = structuredValidation(requirement, resumeText, category);
+  // Compound requirements are evaluated component-by-component. A strong
+  // embedding for the whole sentence can never prove every AND component.
+  if (logicalStructure) {
+    const logical = evaluateLogicalParts(logicalStructure, semanticEvidence, resumeText, category);
+    return {
+      status: logical.status,
+      evidenceReason: logical.reason,
+      bestDistance,
+      lexicalScore: explicit.lexicalScore,
+      componentResults: logical.componentResults,
+      evidence: logical.status === "missing" ? [] : (explicit.chunks.length ? explicit.chunks : semanticEvidence),
+    };
+  }
+
+  const structured = structuredValidation(requirement?.text || requirement, resumeText, category);
   if (structured) {
     const evidenceChunks = explicit.chunks.length ? explicit.chunks : semanticEvidence;
     return {
@@ -416,6 +521,9 @@ const embedJobDescription = async (jdText, sessionId) => {
       category: item.category || "other",
       importance: item.importance || "required",
       weight: Number(item.weight) || importanceWeight(item.importance || "required"),
+      requirementLogic: item.logic || null,
+      requirementComponents: JSON.stringify(Array.isArray(item.components) ? item.components : []),
+      requirementAlternatives: JSON.stringify(Array.isArray(item.alternatives) ? item.alternatives : []),
     })),
   });
 
@@ -493,7 +601,22 @@ const retrieveResumeEvidence = async (sessionId, topK = MAX_EVIDENCE_PER_REQUIRE
     semanticEvidence.sort((a, b) => a.distance - b.distance);
 
     const metadata = requirementMetadatas[index] || {};
-    const evaluation = getEvidenceStatus(requirement, semanticEvidence, completeResumeText, metadata.category || "other");
+    let structuredRequirement = { text: requirement };
+    try {
+      const components = JSON.parse(metadata.requirementComponents || "[]");
+      const alternatives = JSON.parse(metadata.requirementAlternatives || "[]");
+      structuredRequirement = {
+        text: requirement,
+        logic: metadata.requirementLogic || null,
+        components: Array.isArray(components) ? components : [],
+        alternatives: Array.isArray(alternatives) ? alternatives : [],
+      };
+    } catch (_) {
+      // Older Chroma records may not contain structured metadata. The
+      // domain-agnostic text fallback in inferLogicalStructure handles them.
+    }
+
+    const evaluation = getEvidenceStatus(structuredRequirement, semanticEvidence, completeResumeText, metadata.category || "other");
 
     const evidence = (evaluation.evidence || []).slice(0, safeTopK);
     return {

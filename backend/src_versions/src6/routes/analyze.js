@@ -15,7 +15,6 @@ const {
 const { analyzeResume } = require("../services/geminiService");
 const { extractResumeText } = require("../utils/textExtraction");
 const { AppError } = require("../utils/appError");
-const { scoreRequirements } = require("../services/embeddingService");
 const { auditLog, redact } = require("../utils/auditLogger");
 
 // ==================================================
@@ -29,15 +28,17 @@ const isLikelyResume = (text) => {
 
   const lc = text.toLowerCase();
 
-  // Domain-agnostic resume/CV signals. Do not require software-specific
-  // sections such as GitHub, projects, or technical skills.
   const signals = [
-    "experience", "work experience", "professional experience", "employment",
-    "work history", "career history", "education", "qualification",
-    "qualifications", "skills", "competencies", "expertise", "profile",
-    "professional summary", "summary", "objective", "achievements",
-    "awards", "certifications", "licenses", "publications", "portfolio",
-    "internship", "volunteer", "clinical experience", "research experience",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "work experience",
+    "internship",
+    "linkedin",
+    "github",
+    "summary",
+    "certifications",
   ];
 
   const score = signals.reduce(
@@ -45,8 +46,7 @@ const isLikelyResume = (text) => {
     0,
   );
 
-  // A valid CV normally contains at least two broad resume signals.
-  return score >= 2;
+  return score >= 3;
 };
 
 // ==================================================
@@ -133,9 +133,6 @@ const normalizeAnalysis = (analysis, hasJDAnalysis) => {
       : [],
     missingRequirements: Array.isArray(safeAnalysis.missingRequirements)
       ? safeAnalysis.missingRequirements
-      : [],
-    blockingRequirements: Array.isArray(safeAnalysis.blockingRequirements)
-      ? safeAnalysis.blockingRequirements
       : [],
 
     hasJDAnalysis: Boolean(hasJDAnalysis),
@@ -250,7 +247,6 @@ router.post("/", upload, async (req, res, next) => {
     let matchedRequirements = [];
     let possibleRequirements = [];
     let missingRequirements = [];
-    let deterministicBlockingRequirements = [];
     let deterministicJdMatchScore = null;
 
     if (hasJobDescription) {
@@ -321,35 +317,21 @@ router.post("/", upload, async (req, res, next) => {
           .filter(Boolean);
 
         missingRequirements = ragResults
-          .filter((item) => item?.status === "missing")
+          .filter(
+            (item) =>
+              item?.status === "missing" || item?.status === "possible_match",
+          )
           .map((item) => item.requirement)
           .filter(Boolean);
 
-        // The RAG service owns scoring. This prevents the route and the LLM
-        // from maintaining competing scoring implementations.
-        // Calculate the displayed JD score from the exact requirement objects
-        // returned by the matcher. Do not trust an LLM-generated score or a
-        // separately serialized score field. This also protects against MCP
-        // serialization/version mismatches.
-        deterministicJdMatchScore = scoreRequirements(ragResults);
-
-        console.log(
-          `[JD MATCH] requirements=${ragResults.length} ` +
-          `strong=${ragResults.filter((x) => x?.status === "strong_match").length} ` +
-          `possible=${ragResults.filter((x) => x?.status === "possible_match").length} ` +
-          `missing=${ragResults.filter((x) => x?.status === "missing").length} ` +
-          `score=${deterministicJdMatchScore}`,
-        );
-
-        deterministicBlockingRequirements = Array.isArray(evidenceData?.blockingRequirements)
-          ? evidenceData.blockingRequirements
-          : ragResults
-              .filter((item) =>
-                ["critical", "required"].includes(item?.importance) &&
-                item?.status === "missing"
-              )
-              .map((item) => item.requirement)
-              .filter(Boolean);
+        deterministicJdMatchScore =
+          ragResults.length > 0
+            ? Math.round((matchedRequirements.length / ragResults.length) * 100)
+            : 0;
+        // const relevantJDRequirements = ragResults
+        //   .filter((item) => item?.status !== "missing")
+        //   .map((item) => item.requirement)
+        //   .filter(Boolean);
 
         hasJDAnalysis = ragResults.length > 0;
       } finally {
@@ -384,13 +366,11 @@ router.post("/", upload, async (req, res, next) => {
       analysis.matchedRequirements = matchedRequirements;
       analysis.possibleRequirements = possibleRequirements;
       analysis.missingRequirements = missingRequirements;
-      analysis.blockingRequirements = deterministicBlockingRequirements;
       analysis.jdMatchScore = deterministicJdMatchScore;
     } else {
       analysis.matchedRequirements = [];
       analysis.possibleRequirements = [];
       analysis.missingRequirements = [];
-      analysis.blockingRequirements = [];
       analysis.jdMatchScore = null;
     }
 

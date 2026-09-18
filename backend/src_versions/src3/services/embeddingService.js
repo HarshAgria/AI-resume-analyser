@@ -197,65 +197,8 @@ const hasDegreeEvidence = (requirement, resumeText) => {
   return false;
 };
 
-
-const parseRequirementAlternatives = (requirement) => {
-  const text = cleanRequirement(requirement);
-  const parts = text.split(/\s+(?:or|\/|\|)\s+/i).map((x) => x.trim()).filter(Boolean);
-  if (parts.length < 2) return null;
-
-  const parseBranch = (branch) => {
-    const normalized = normalizeText(branch);
-    const degree = /\b(master|m\.s\.?|mtech|m\.e\.?|msc|mba)\b/i.test(normalized)
-      ? "master"
-      : /\b(bachelor|b\.s\.?|btech|b\.e\.?|bsc|bca)\b/i.test(normalized)
-        ? "bachelor"
-        : null;
-    const years = extractYearRanges(branch);
-    return { text: branch, degree, minYears: years.length ? Math.min(...years) : null, maxYears: years.length > 1 ? Math.max(...years) : null };
-  };
-
-  const branches = parts.map(parseBranch);
-  // Only activate structured OR handling when every branch contains a
-  // recognizable qualification constraint. This keeps the matcher universal
-  // and prevents ordinary prose containing "or" from becoming special logic.
-  if (branches.length >= 2 && branches.some((x) => x.degree || x.minYears !== null)) {
-    return branches;
-  }
-  return null;
-};
-
-const validateAlternativeBranch = (branch, resumeText) => {
-  const degreeOk = branch.degree
-    ? hasDegreeEvidence(branch.text, resumeText)
-    : true;
-  if (!degreeOk) return false;
-
-  if (branch.minYears !== null) {
-    return calculateExperienceYears(resumeText) >= branch.minYears;
-  }
-  return true;
-};
-
 const structuredValidation = (requirement, resumeText, category) => {
   const req = normalizeText(requirement);
-
-  // Handle universal OR-qualified requirements such as:
-  // "MS + 0-2 years OR BS + 1-3 years". A candidate only needs to satisfy
-  // one complete branch; the other branch must not be counted as missing.
-  const alternatives = parseRequirementAlternatives(requirement);
-  if (alternatives) {
-    const matchedBranch = alternatives.find((branch) => validateAlternativeBranch(branch, resumeText));
-    if (matchedBranch) {
-      return {
-        status: "strong_match",
-        reason: `The resume satisfies one of the stated qualification alternatives: "${matchedBranch.text}".`,
-      };
-    }
-    return {
-      status: "missing",
-      reason: "The resume does not satisfy any of the stated qualification alternatives.",
-    };
-  }
   const resume = normalizeText(resumeText);
   const hasDegreeCue = /\b(?:bs|bachelor|b\.s\.|btech|b\.?e\.?|bsc|bca|master|ms|m\.s\.|mtech|m\.?e\.?|msc|mba|degree)\b/.test(req);
   const requestedYears = extractYearRanges(req);

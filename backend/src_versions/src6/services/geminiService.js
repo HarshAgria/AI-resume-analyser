@@ -6,7 +6,7 @@ const {
 const { AppError } = require("../utils/appError");
 const {
   normalizeText,
-} = require("../utils/textExtraction");
+} = require("./embeddingService");
 
 // ==================================================
 // Gemini
@@ -18,14 +18,7 @@ const genAI = new GoogleGenerativeAI(
 
 const MODEL_NAME =
   process.env.GEMINI_MODEL ||
-  "gemini-3.5-flash-lite";
-
-const MODEL_FALLBACKS = (process.env.GEMINI_MODEL_FALLBACKS || "gemini-3.6-flash,gemini-3.7-flash,gemini-3.8-flash")
-  .split(",")
-  .map((m) => m.trim())
-  .filter(Boolean);
-const MAX_MODEL_RETRIES = Number(process.env.GEMINI_MODEL_RETRIES || 2);
-const RETRY_BASE_MS = Number(process.env.GEMINI_RETRY_BASE_MS || 1000);
+  "gemini-3.1-flash-lite";
 
 const MAX_INPUT_CHARS = Number(
   process.env.MAX_AI_INPUT_CHARS || 22000,
@@ -74,49 +67,6 @@ const withTimeout = async (
   } finally {
     clearTimeout(timeoutHandle);
   }
-};
-
-const isTransientGeminiError = (error) => {
-  const status = Number(error?.status || error?.statusCode || error?.code);
-  if ([429, 500, 502, 503, 504].includes(status)) return true;
-  const message = String(error?.message || error || "").toLowerCase();
-  return /service unavailable|temporarily unavailable|high demand|overloaded|rate limit|quota|timeout|timed out|fetching from .*generativelanguage/i.test(message);
-};
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const generateWithModelFallback = async (prompt) => {
-  const models = [...new Set([MODEL_NAME, ...MODEL_FALLBACKS])];
-  let lastError;
-
-  for (const modelName of models) {
-    const model = genAI.getGenerativeModel({ model: modelName });
-
-    for (let attempt = 0; attempt <= MAX_MODEL_RETRIES; attempt += 1) {
-      try {
-        const result = await withTimeout(model.generateContent(prompt), AI_TIMEOUT_MS);
-        return { result, modelName };
-      } catch (error) {
-        lastError = error;
-        const status = Number(error?.status || error?.statusCode || error?.code);
-        const message = String(error?.message || error || "");
-        const modelUnavailable = [400, 404].includes(status) || /model.*(not found|does not exist|not supported)|not found/i.test(message);
-
-        // A bad/retired model must not consume retries. Move immediately to the next model.
-        if (modelUnavailable) break;
-        if (!isTransientGeminiError(error) || attempt === MAX_MODEL_RETRIES) break;
-        await sleep(RETRY_BASE_MS * (2 ** attempt));
-      }
-    }
-  }
-
-  throw new AppError(
-    "AI_MODEL_UNAVAILABLE",
-    "Gemini is temporarily unavailable. The analyzer tried the configured model and fallback models. Please retry shortly.",
-    503,
-    lastError?.message,
-    true,
-  );
 };
 
 // ==================================================
@@ -203,6 +153,7 @@ const splitIntoChunks = async (
 // ==================================================
 
 const summarizeLongResume = async (
+  model,
   text,
 ) => {
   if (!text) {
@@ -260,10 +211,13 @@ Section ${index + 1}/${chunks.length}:
 ${chunk}
 `;
 
-    const { result } =
-      await generateWithModelFallback(
+    const result =
+      await withTimeout(
+        model.generateContent(
           chunkPrompt,
-        );
+        ),
+        AI_TIMEOUT_MS,
+      );
 
     const summary =
       result.response
@@ -316,9 +270,12 @@ Resume notes:
 ${combined}
 `;
 
-  const { result } =
-    await generateWithModelFallback(
-      compressionPrompt,
+  const result =
+    await withTimeout(
+      model.generateContent(
+        compressionPrompt,
+      ),
+      AI_TIMEOUT_MS,
     );
 
   return result.response
@@ -504,22 +461,6 @@ const mapAiError = (
   }
 
   if (
-    message.includes("503") ||
-    message.includes("service unavailable") ||
-    message.includes("high demand") ||
-    message.includes("temporarily unavailable") ||
-    message.includes("overloaded")
-  ) {
-    return new AppError(
-      "AI_MODEL_UNAVAILABLE",
-      "Gemini is temporarily overloaded. Please retry shortly; the analyzer will automatically use a fallback model when available.",
-      503,
-      err.message,
-      true,
-    );
-  }
-
-  if (
     message.includes(
       "429",
     ) ||
@@ -568,6 +509,11 @@ const analyzeResume = async (
     );
   }
 
+  const model =
+    genAI.getGenerativeModel({
+      model: MODEL_NAME,
+    });
+
   const normalized =
     normalizeText(
       resumeText,
@@ -593,6 +539,7 @@ const analyzeResume = async (
   try {
     const preparedResume =
       await summarizeLongResume(
+        model,
         normalized,
       );
 
@@ -672,7 +619,7 @@ to exactly ONE "Requirement N:" from the deterministic RAG data.
 Mapping rules:
 
 - strong_match → matchedRequirements
-- possible_match → possibleRequirements
+- possible_match → missingRequirements
 - missing → missingRequirements
 
 For every Requirement N:
@@ -725,26 +672,37 @@ The raw job description is contextual information only. It is NOT
 a source for constructing these arrays.
 
 ========================================
-EVIDENCE MATCHING RULE
+TECHNICAL TERM RULE
 ========================================
 
-This analyzer is domain-agnostic. Requirements may concern any profession,
-including technology, finance, healthcare, sales, marketing, operations,
-legal, education, design, research, skilled trades, public sector, or other
-fields. Never assume that a requirement is technical.
+Explicit technical evidence is required for technical requirements.
 
-Use the deterministic retrieval status and supplied evidence as the source
-of truth. Semantic similarity may connect differently worded but equivalent
-experience; do not invent qualifications, credentials, employers, tools, or
-experience that are not supported by the resume evidence.
+Examples:
 
-A possible_match means related evidence exists but the match is uncertain. It
-must appear in possibleRequirements, not missingRequirements.
+"Node.js" requires explicit Node.js/NodeJS evidence.
 
-A missing requirement means the supplied resume evidence does not demonstrate
-the requirement sufficiently.
+"Express.js and REST API" requires evidence for both concepts.
 
-========================================
+"PostgreSQL or another relational database" is satisfied if at least one accepted relational database is explicitly demonstrated.
+
+"Authentication and API security" requires explicit evidence for both authentication and API security.
+
+"Automated backend testing" may be satisfied by explicit automated testing, unit testing, or integration testing evidence.
+
+Do not infer a missing technology from related technologies.
+
+For example:
+
+AWS + Docker + Kubernetes
+
+does NOT prove:
+
+Node.js
+Express.js
+PostgreSQL
+Microservices
+API security
+
 ========================================
 JSON SCHEMA
 ========================================
@@ -775,16 +733,9 @@ JSON SCHEMA
     "<requirement 1>",
     "<requirement 2>"
   ],
-  "possibleRequirements": [
-    "<requirement 1>",
-    "<requirement 2>"
-  ],
   "missingRequirements": [
     "<requirement 1>",
     "<requirement 2>"
-  ],
-  "blockingRequirements": [
-    "<critical or required requirement with missing evidence>"
   ],
   "candidateName": "<full name if present, otherwise empty string>",
   "alignment": {
@@ -808,11 +759,9 @@ If deterministic JD requirements are provided:
 
 - Calculate jdMatchScore from 0 to 100.
 - Use deterministic retrieval statuses as the primary evidence.
-- matchedRequirements may contain only strongly demonstrated requirements.
-- possibleRequirements may contain only uncertain/partial matches.
-- missingRequirements must contain only requirements with missing evidence.
+- matchedRequirements may contain only demonstrated requirements.
+- missingRequirements must contain requirements not demonstrated.
 - possible_match requirements must not be treated as certain.
-- possible_match requirements belong in possibleRequirements, not missingRequirements.
 - Do not invent requirements.
 - Do not invent resume evidence.
 
@@ -869,7 +818,7 @@ Maximum 5.
 
 Only suggest keywords relevant to:
 - target role
-- the candidate's demonstrated domain and career direction
+- candidate profession
 
 Do not include technologies already present in the resume.
 
@@ -902,7 +851,7 @@ Score based on:
 - target-role relevance
 - clarity
 - measurable impact
-- domain expertise and relevant capabilities
+- technical depth
 - structure
 - demonstrated experience
 
@@ -938,10 +887,13 @@ FINAL OUTPUT
 Return ONLY valid JSON.
 `;
 
-    const { result } =
-      await generateWithModelFallback(
+    const result =
+      await withTimeout(
+        model.generateContent(
           prompt,
-        );
+        ),
+        AI_TIMEOUT_MS,
+      );
 
     const parsed =
       parseJsonResponse(
@@ -1024,41 +976,42 @@ Return ONLY valid JSON.
               item.requirement,
           );
 
-      const possibleMatches =
-        relevantJDChunks
-          .filter((item) => item?.status === "possible_match")
-          .map((item) => item.requirement);
-
       const missing =
         relevantJDChunks
-          .filter((item) => item?.status === "missing")
-          .map((item) => item.requirement);
+          .filter(
+            (item) =>
+              item?.status ===
+                "missing" ||
+              item?.status ===
+                "possible_match",
+          )
+          .map(
+            (item) =>
+              item.requirement,
+          );
 
-      normalizedResult.matchedRequirements = strongMatches;
-      normalizedResult.possibleRequirements = possibleMatches;
-      normalizedResult.missingRequirements = missing;
+      normalizedResult.matchedRequirements =
+        strongMatches;
 
-      const weightedTotal = relevantJDChunks.reduce(
-        (total, item) => total + (Number(item?.weight) || 1),
-        0,
-      );
+      normalizedResult.missingRequirements =
+        missing;
 
-      const weightedEvidence = relevantJDChunks.reduce((total, item) => {
-        const weight = Number(item?.weight) || 1;
-        const value = item?.status === "strong_match" ? 1 : item?.status === "possible_match" ? 0.5 : 0;
-        return total + weight * value;
-      }, 0);
+      const total =
+        relevantJDChunks.length;
 
-      normalizedResult.jdMatchScore = weightedTotal > 0
-        ? Number(((weightedEvidence / weightedTotal) * 100).toFixed(1))
-        : 0;
+      const matched =
+        strongMatches.length;
 
-      normalizedResult.blockingRequirements = relevantJDChunks
-        .filter((item) =>
-          (item?.importance === "critical" || item?.importance === "required") &&
-          item?.status === "missing"
-        )
-        .map((item) => item.requirement);
+      normalizedResult.jdMatchScore =
+        total > 0
+          ? Number(
+              (
+                (matched /
+                  total) *
+                100
+              ).toFixed(1),
+            )
+          : 0;
     } else {
       normalizedResult.jdMatchScore =
         null;
